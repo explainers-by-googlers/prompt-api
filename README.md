@@ -376,4 +376,4 @@ Finally, we intend to prohibit (in the specification) any use of user-specific i
   * Gecko: not yet requested
   * WebKit: not yet requested
   * Edge: not yet requested
-* Web developers: positive ([example](https://x.com/mortenjust/status/1805190952358650251), [example](https://tyingshoelaces.com/blog/chrome-ai-prompt-api))
+* Web developers: positive ([example](https://x.com/mortenjust/status/1805190952358650251), [example](https://tyingshoelaces.com/blog/chrome-ai-prompt-api), [example](https://labs.thinktecture.com/local-small-language-models-in-the-browser-a-first-glance-at-chromes-built-in-ai-and-prompt-api-with-gemini-nano/))
