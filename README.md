@@ -111,7 +111,7 @@ const result2 = await predictEmoji("This code is so good you should get promoted
 
 ### Configuration of per-session options
 
-In addition to the `systemPrompt` and `initialPrompts` options shown above, the currently-configurable options are [temperature and top-K](https://gemini.google.com/share/a4665036f4b9). More information about the values for these parameters can be found by calling `textModelInfo()`.
+In addition to the `systemPrompt` and `initialPrompts` options shown above, the currently-configurable options are [temperature](https://huggingface.co/blog/how-to-generate#sampling) and [top-K](https://huggingface.co/blog/how-to-generate#top-k-sampling). More information about the values for these parameters can be found by calling `textModelInfo()`.
 
 ```js
 const customSession = await ai.createTextSession({
