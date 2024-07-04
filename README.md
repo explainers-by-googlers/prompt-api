@@ -197,7 +197,7 @@ switch (canCreate) {
   case "after-download": {
     console.log("Going to download a language model; sit tight!");
     ai.addEventListener("textmodeldownloadprogress", e => {
-      console.log("Download progress: ${e.loaded} / ${e.total} bytes.");
+      console.log(`Download progress: ${e.loaded} / ${e.total} bytes.`);
     });
     break;
   }
