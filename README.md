@@ -197,7 +197,7 @@ switch (canCreate) {
   case "after-download": {
     console.log("Going to download a language model; sit tight!");
     ai.addEventListener("textmodeldownloadprogress", e => {
-      console.log("Download progress: ${e.loaded} / ${e.total} bytes.");
+      console.log(`Download progress: ${e.loaded} / ${e.total} bytes.`);
     });
     break;
   }
@@ -212,7 +212,7 @@ switch (canCreate) {
 //   after it completes, or reject if it fails or the session creation fails.
 //
 // * If canCreate was "readily", this will fulfill or reject relatively quickly, based
-//   on whether session creation succeeeds or fails.
+//   on whether session creation succeeds or fails.
 let session;
 try {
   session = await ai.createTextSession();
