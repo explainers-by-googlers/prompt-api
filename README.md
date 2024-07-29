@@ -226,6 +226,7 @@ Some notes on this API:
 
 * We do not expose the actual tokenization to developers since that would make it too easy to depend on model-specific details.
 * Implementations must include in their count any control tokens that will be necessary to process the prompt, e.g. ones indicating the start or end of the input.
+* The counting process can be aborted by passing an `AbortSignal`, i.e. `session.countPromptTokens(promptString, { signal })`.
 
 It's possible to send a prompt that causes the context window to overflow. That is, consider a case where `session.countPromptTokens(promptString) > session.tokensLeft` before calling `session.prompt(promptString)`, and then the web developer calls `session.prompt(promptString)` anyway. In such cases, the initial portions of the conversation with the assistant will be removed, one prompt/response pair at a time, until enough tokens are available to process the new prompt. The exception is the [system prompt](#system-prompts), which is never removed. If it's not possible to remove enough tokens from the conversation history to process the new prompt, then the `prompt()` or `promptStreaming()` call will fail with an `"QuotaExceededError"` `DOMException` and nothing will be removed.
 
