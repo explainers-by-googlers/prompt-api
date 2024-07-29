@@ -38,6 +38,12 @@ _Tracking issue: <https://issues.chromium.org/issues/343325183>_
 
 The `systemPrompt` and `initialPrompts` options are not yet supported. Instead, you have to manually emulate these by using special control tokens in the middle of your prompt.
 
+## Tokenization and overflow APIs
+
+_Tracking issue: <https://issues.chromium.org/issues/355962207>_
+
+The `countPromptTokens()`, `maxTokens`, `tokensSoFar`, and `tokensLeft` APIs, as well as the `contextoverflow` event, are not yet implemented.
+
 ## `topK` and `temperature` both required
 
 _Tracking issue: <https://issues.chromium.org/issues/343600797>_

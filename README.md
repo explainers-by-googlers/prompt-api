@@ -81,6 +81,8 @@ console.log(await session.prompt("What is your favorite food?"));
 
 The system prompt is special, in that the assistant will not respond to it, and it will be preserved even if the context window otherwise overflows due to too many calls to `prompt()`.
 
+If the system prompt is too large (see [below](#tokenization-context-window-length-limits-and-overflow)), then the promise will be rejected with a `"QuotaExceededError"` `DOMException`.
+
 ### N-shot prompting
 
 If developers want to provide examples of the user/assistant interaction, they can use the `initialPrompts` array. This aligns with the common "chat completions API" format of `{ role, content }` pairs, including a `"system"` role which can be used instead of the `systemPrompt` option shown above.
@@ -107,7 +109,10 @@ const result1 = await predictEmoji("Back to the drawing board");
 const result2 = await predictEmoji("This code is so good you should get promoted");
 ```
 
-(Using both `systemPrompt` and a `{ role: "system" }` prompt in `initialPrompts`, or using multiple `{ role: "system" }` prompts, or placing the `{ role: "system" }` prompt anywhere besides at the 0th position in `initialPrompts`, will reject with a `TypeError`.)
+Some details on error cases:
+
+* Using both `systemPrompt` and a `{ role: "system" }` prompt in `initialPrompts`, or using multiple `{ role: "system" }` prompts, or placing the `{ role: "system" }` prompt anywhere besides at the 0th position in `initialPrompts`, will reject with a `TypeError`.
+* If the combined token length of all the initial prompts (including the separate `systemPrompt`, if provided) is too large, then the promise will be rejected with a `"QuotaExceededError"` `DOMException`.
 
 ### Configuration of per-session options
 
@@ -203,6 +208,36 @@ Note that because sessions are stateful, and prompts can be queued, aborting a s
 * If the prompt is being currently processed by the model, then it will be aborted, and the prompt/response pair will be removed from the conversation history.
 * If the prompt has already been fully processed by the model, then attempting to abort the prompt will do nothing.
 
+### Tokenization, context window length limits, and overflow
+
+A given assistant session will have a maximum number of tokens it can process. Developers can check their current usage and progress toward that limit by using the following properties on the session object:
+
+```js
+console.log(`${session.tokensSoFar}/${session.maxTokens} (${session.tokensLeft} left)`);
+```
+
+To know how many tokens a string will consume, without actually processing it, developers can use the `countPromptTokens()` method:
+
+```js
+const numTokens = await session.countPromptTokens(promptString);
+```
+
+Some notes on this API:
+
+* We do not expose the actual tokenization to developers since that would make it too easy to depend on model-specific details.
+* Implementations must include in their count any control tokens that will be necessary to process the prompt, e.g. ones indicating the start or end of the input.
+* The counting process can be aborted by passing an `AbortSignal`, i.e. `session.countPromptTokens(promptString, { signal })`.
+
+It's possible to send a prompt that causes the context window to overflow. That is, consider a case where `session.countPromptTokens(promptString) > session.tokensLeft` before calling `session.prompt(promptString)`, and then the web developer calls `session.prompt(promptString)` anyway. In such cases, the initial portions of the conversation with the assistant will be removed, one prompt/response pair at a time, until enough tokens are available to process the new prompt. The exception is the [system prompt](#system-prompts), which is never removed. If it's not possible to remove enough tokens from the conversation history to process the new prompt, then the `prompt()` or `promptStreaming()` call will fail with an `"QuotaExceededError"` `DOMException` and nothing will be removed.
+
+Such overflows can be detected by listening for the `"contextoverflow"` event on the session:
+
+```js
+session.addEventListener("contextoverflow", () => {
+  console.log("Context overflow!");
+});
+```
+
 ### Capabilities detection
 
 In all our above examples, we call `ai.assistant.create()` and assume it will always succeed.
@@ -294,12 +329,19 @@ interface AIAssistantFactory {
 };
 
 [Exposed=(Window,Worker)]
-interface AIAssistant {
+interface AIAssistant : EventTarget {
   Promise<DOMString> prompt(DOMString input, optional AIAssistantPromptOptions options = {});
   ReadableStream promptStreaming(DOMString input, optional AIAssistantPromptOptions options = {});
 
+  Promise<unsigned long long> countPromptTokens(DOMString input, optional AIAssistantPromptOptions options = {});
+  readonly attribute unsigned long long maxTokens;
+  readonly attribute unsigned long long tokensSoFar;
+  readonly attribute unsigned long long tokensLeft;
+
   readonly attribute unsigned long topK;
   readonly attribute float temperature;
+
+  attribute EventHandler oncontextoverflow;
 
   Promise<AIAssistant> clone();
   undefined destroy();
