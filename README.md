@@ -37,7 +37,7 @@ Our goals are to:
 
 The following are explicit non-goals:
 
-* We do not intend to force every browser to ship or expose a language model; in particular, not all devices will be capable of storing or running one. It would be conforming to implement this API by always returning `"no"` from `canCreateTextSession()`, or to implement this API entirely by using cloud services instead of on-device models.
+* We do not intend to force every browser to ship or expose a language model; in particular, not all devices will be capable of storing or running one. It would be conforming to implement this API by always signaling that no language model is available, or to implement this API entirely by using cloud services instead of on-device models.
 * We do not intend to provide guarantees of language model quality, stability, or interoperability between browsers. In particular, we cannot guarantee that the models exposed by these APIs are particularly good at any given use case. These are left as quality-of-implementation issues, similar to the [shape detection API](https://wicg.github.io/shape-detection-api/). (See also a [discussion of interop](https://www.w3.org/reports/ai-web-impact/#interop) in the W3C "AI & the Web" document.)
 
 The following are potential goals we are not yet certain of:
@@ -54,7 +54,7 @@ Both of these potential goals could pose challenges to interoperability, so we w
 In this example, a single string is used to prompt the API, which is assumed to come from the user. The returned response is from the assistant.
 
 ```js
-const session = await ai.createTextSession();
+const session = await ai.assistant.create();
 
 // Prompt the model and wait for the whole result to come back.
 const result = await session.prompt("Write me a poem.");
@@ -69,24 +69,24 @@ for await (const chunk of stream) {
 
 ### System prompts
 
-The model can be configured with a special "system prompt" which gives it the context for future assistant/user interactions:
+The assistant can be configured with a special "system prompt" which gives it the context for future interactions:
 
 ```js
-const session = await ai.createTextSession({
+const session = await ai.assistant.create({
   systemPrompt: "Pretend to be an eloquent hamster."
 });
 
 console.log(await session.prompt("What is your favorite food?"));
 ```
 
-The system prompt  is special, in that the model will not respond to it, and it will be preserved even if the context window otherwise overflows due to too many calls to `prompt()`.
+The system prompt is special, in that the assistant will not respond to it, and it will be preserved even if the context window otherwise overflows due to too many calls to `prompt()`.
 
 ### N-shot prompting
 
 If developers want to provide examples of the user/assistant interaction, they can use the `initialPrompts` array. This aligns with the common "chat completions API" format of `{ role, content }` pairs, including a `"system"` role which can be used instead of the `systemPrompt` option shown above.
 
 ```js
-const session = await ai.createTextSession({
+const session = await ai.assistant.create({
   initialPrompts: [
     { role: "system", content: "Predict up to 5 emojis as a response to a comment. Output emojis, comma-separated." },
     { role: "user", content: "This is amazing!" },
@@ -98,8 +98,8 @@ const session = await ai.createTextSession({
 
 // Clone an existing session for efficiency, instead of recreating one each time.
 async function predictEmoji(comment) {
-  const session = await session.clone();
-  return await session.prompt(comment);
+  const freshSession = await session.clone();
+  return await freshSession.prompt(comment);
 }
 
 const result1 = await predictEmoji("Back to the drawing board");
@@ -111,28 +111,28 @@ const result2 = await predictEmoji("This code is so good you should get promoted
 
 ### Configuration of per-session options
 
-In addition to the `systemPrompt` and `initialPrompts` options shown above, the currently-configurable options are [temperature](https://huggingface.co/blog/how-to-generate#sampling) and [top-K](https://huggingface.co/blog/how-to-generate#top-k-sampling). More information about the values for these parameters can be found by calling `textModelInfo()`.
+In addition to the `systemPrompt` and `initialPrompts` options shown above, the currently-configurable options are [temperature](https://huggingface.co/blog/how-to-generate#sampling) and [top-K](https://huggingface.co/blog/how-to-generate#top-k-sampling). More information about the values for these parameters can be found using the `capabilities()` API explained [below](#capabilities-detection).
 
 ```js
-const customSession = await ai.createTextSession({
+const customSession = await ai.assistant.create({
   temperature: 0.8,
   topK: 10
 });
 
-const modelInfo = await ai.textModelInfo();
-const slightlyHighTemperatureSession = await ai.createTextSession({
-  temperature: Math.max(modelInfo.defaultTemperature * 1.2, 1.0),
+const capabilities = await ai.assistant.capabilities();
+const slightlyHighTemperatureSession = await ai.assistant.create({
+  temperature: Math.max(capabilities.defaultTemperature * 1.2, 1.0),
 });
 
-// modelInfo also contains defaultTopK and maxTopK.
+// capabilities also contains defaultTopK and maxTopK.
 ```
 
-### Session persistence, cloning, and destruction
+### Session persistence and cloning
 
-Each session consists of a persistent series of interactions with the model:
+Each assistant session consists of a persistent series of interactions with the model:
 
 ```js
-const session = await ai.createTextSession({
+const session = await ai.assistant.create({
   systemPrompt: "You are a friendly, helpful assistant specialized in clothing choices."
 });
 
@@ -150,132 +150,193 @@ const result2 = await session.prompt(`
 Multiple unrelated continuations of the same prompt can be set up by creating a session and then cloning it:
 
 ```js
-const session = await ai.createTextSession({
+const session = await ai.assistant.create({
   systemPrompt: "You are a friendly, helpful assistant specialized in clothing choices."
 });
 
 const session2 = await session.clone();
 ```
 
-A session can be destroyed to free some resources when it’s not needed anymore. After destroying it, it can’t be prompted anymore, and any ongoing prompt calls will be rejected with an `"InvalidStateError"` `DOMException`.
+### Session destruction
+
+An assistant session can be destroyed, either by using an `AbortSignal` passed to the `create()` method call:
 
 ```js
-session.destroy();
+const controller = new AbortController();
+stopButton.onclick = () => controller.abort();
 
-// The promise will be rejected with an error explaining that the session is destroyed.
-await session.prompt(`
-  What should I wear today? It's sunny and I'm unsure between a t-shirt and a polo.
-`);
+const session = await ai.assistant.create({ signal: controller.signal });
 ```
 
-### Availability detection, download progress, and error handling
+or by calling `destroy()` on the session:
 
-In all our above examples, we call `ai.createTextSession()` and assume it will always succeed.
+```js
+stopButton.onclick = () => session.destroy();
+```
 
-However, sometimes a language model needs to be downloaded before the API can be used. In such cases, immediately calling `createTextSession()` will start the download, which might take a long time. You can give your users a better experience by detecting this condition using `canCreateTextSession()`, which returns one of three values:
+Destroying a session will:
+
+* Abort any ongoing downloads or loading process for the language model.
+
+* Reject any ongoing calls to `prompt()` with an `"AbortError"` `DOMException` (or the given abort reason).
+
+* Error any `ReadableStream`s returned by `promptStreaming()` with an `"AbortError"` `DOMException` (or the given abort reason).
+
+* And, most importantly, allow the user agent to unload the language model from memory. (If no other APIs or sessions are using it.)
+
+The ability to manually destroy a session allows applications to free up memory without waiting for garbage collection, which can be useful since language models can be quite large.
+
+### Aborting a specific prompt
+
+Specific calls to `prompt()` or `promptStreaming()` can be aborted by passing an `AbortSignal` to them:
+
+```js
+const controller = new AbortController();
+stopButton.onclick = () => controller.abort();
+
+const result = await session.prompt("Write me a poem", { signal: controller.signal });
+```
+
+Note that because sessions are stateful, and prompts can be queued, aborting a specific prompt is slightly complicated:
+
+* If the prompt is still queued behind other prompts in the session, then it will be removed from the queue.
+* If the prompt is being currently processed by the model, then it will be aborted, and the prompt/response pair will be removed from the conversation history.
+* If the prompt has already been fully processed by the model, then attempting to abort the prompt will do nothing.
+
+### Capabilities detection
+
+In all our above examples, we call `ai.assistant.create()` and assume it will always succeed.
+
+However, sometimes a language model needs to be downloaded before the API can be used. In such cases, immediately calling `create()` will start the download, which might take a long time. The capabilities API gives you insight into the download status of the model:
+
+```js
+const capabilities = await ai.assistant.capabilities();
+console.log(capabilities.available);
+```
+
+The `capabilities.available` property is a string that can take one of three values:
 
 * `"no"`, indicating the device or browser does not support prompting a language model at all.
 * `"after-download"`, indicating the device or browser supports prompting a language model, but it needs to be downloaded before it can be used.
 * `"readily"`, indicating the device or browser supports prompting a language model and it’s ready to be used without any downloading steps.
 
-In the `"after-download"` case, developers might want to have users confirm before you call `createTextSession()` to start the download, since doing so uses up significant bandwidth and users might not be willing to wait for a large download before using the site or feature.
+In the `"after-download"` case, developers might want to have users confirm before you call `create()` to start the download, since doing so uses up significant bandwidth and users might not be willing to wait for a large download before using the site or feature.
 
-Note that regardless of the return value of `canCreateTextSession()`, `createTextSession()` might also fail, if either the download fails or the session creation fails.
+Note that regardless of the return value of `available`, `create()` might also fail, if either the download fails or the session creation fails.
 
-When a download has been started by `createTextSession()`, the `ai` object will emit `textmodeldownloadprogress` events, which are of type `ProgressEvent`. They can be used to display a progress bar or similar.
+The capabilities API also contains other information about the model:
 
-See [Downloading and session creation flow](#downloading-and-session-creation-flow) for the full details on the internal state machine.
+* `defaultTemperature`, `defaultTopK`, and `maxTopK` properties giving information about the model's sampling parameters.
+* `supportsLanguage(languageTag)`, which returns `"no"`, `"after-download"`, or `"readily"` to indicate whether the model supports conversing in a given human language.
+
+### Download progress
+
+In cases where the model needs to be downloaded as part of creation, you can monitor the download progress (e.g. in order to show your users a progress bar) using code such as the following:
 
 ```js
-const canCreate = await ai.canCreateTextSession();
-
-switch (canCreate) {
-  case "no": {
-    console.log("This browser/device cannot provide a language model.");
-    break;
-  }
-  case "after-download": {
-    console.log("Going to download a language model; sit tight!");
-    ai.addEventListener("textmodeldownloadprogress", e => {
-      console.log(`Download progress: ${e.loaded} / ${e.total} bytes.`);
+const session = await ai.assistant.create({
+  monitor(m) {
+    m.addEventListener("downloadprogress", e => {
+      console.log(`Downloaded ${e.loaded} of ${e.total} bytes.`);
     });
-    break;
   }
-  case "readily": {
-    console.log("The language model is already downloaded; creating it will be quick.");
-  }
-}
-
-// * If canCreate was "no", this will throw a "NotSupportedError" DOMException.
-//
-// * If canCreate was "after-download", this will kick off the download and only fulfill
-//   after it completes, or reject if it fails or the session creation fails.
-//
-// * If canCreate was "readily", this will fulfill or reject relatively quickly, based
-//   on whether session creation succeeds or fails.
-let session;
-try {
-  session = await ai.createTextSession();
-  console.log("Creating the session succeeded!");
-} catch (e) {
-  console.error("Creating the session failed, either in the downloading or session " +
-                "creation steps. More details: ", e);
-}
-
-// Now prompt it as usual...
+});
 ```
+
+If the download fails, then `downloadprogress` events will stop being emitted, and the promise returned by `create()` will be rejected with a "`NetworkError`" `DOMException`.
+
+<details>
+<summary>What's up with this pattern?</summary>
+
+This pattern is a little involved. Several alternatives have been considered. However, asking around the web standards community it seemed like this one was best, as it allows using standard event handlers and `ProgressEvent`s, and also ensures that once the promise is settled, the assistant object is completely ready to use.
+
+It is also nicely future-extensible by adding more events and properties to the `m` object.
+
+Finally, note that there is a sort of precedent in the (never-shipped) [`FetchObserver` design](https://github.com/whatwg/fetch/issues/447#issuecomment-281731850).
+</details>
 
 ## Detailed design
 
 ### Full API surface in Web IDL
 
 ```webidl
+// Shared self.ai APIs
+
 partial interface WindowOrWorkerGlobalScope {
   [Replaceable] readonly attribute AI ai;
-}
-
-[Exposed=(Window,Worker)]
-interface AI {
-  Promise<AIModelAvailability> canCreateTextSession();
-  Promise<AITextSession> createTextSession(optional AITextSessionOptions options = {});
-
-  attribute EventHandler ontextmodeldownloadprogress;
-
-  Promise<AITextModelInfo> textModelInfo();
 };
 
 [Exposed=(Window,Worker)]
-interface AITextSession {
-  Promise<DOMString> prompt(DOMString input);
-  ReadableStream promptStreaming(DOMString input);
+interface AI {
+  readonly attribute AIAssistantFactory assistant;
+};
+
+[Exposed=(Window,Worker)]
+interface AICreateMonitor : EventTarget {
+  attribute EventHandler ondownloadprogress;
+
+  // Might get more stuff in the future, e.g. for
+  // https://github.com/explainers-by-googlers/prompt-api/issues/4
+};
+
+callback AICreateMonitorCallback = undefined (AICreateMonitor monitor);
+
+enum AICapabilityAvailability { "readily", "after-download", "no" };
+```
+
+```webidl
+// Assistant
+
+[Exposed=(Window,Worker)]
+interface AIAssistantFactory {
+  Promise<AIAssistant> create(optional AIAssistantCreateOptions options = {});
+  Promise<AIAssistantCapabilities> capabilities();
+};
+
+[Exposed=(Window,Worker)]
+interface AIAssistant {
+  Promise<DOMString> prompt(DOMString input, optional AIAssistantPromptOptions options = {});
+  ReadableStream promptStreaming(DOMString input, optional AIAssistantPromptOptions options = {});
 
   readonly attribute unsigned long topK;
   readonly attribute float temperature;
 
-  Promise<AITextSession> clone();
+  Promise<AIAssistant> clone();
   undefined destroy();
 };
 
-dictionary AITextSessionOptions {
-  [EnforceRange] unsigned long topK;
-  float temperature;
-  DOMString systemPrompt;
-  sequence<AIPrompt> initialPrompts;
+[Exposed=(Window,Worker)]
+interface AIAssistantCapabilities {
+  readonly attribute AICapabilityAvailability available;
+
+  // Always null if available === "no"
+  readonly attribute unsigned long? defaultTopK;
+  readonly attribute unsigned long? maxTopK;
+  readonly attribute float? defaultTemperature;
+
+  AICapabilityAvailability supportsLanguage(DOMString languageTag);
 };
 
-dictionary AIPrompt {
-  AIPromptRole role;
+dictionary AIAssistantCreateOptions {
+  AbortSignal signal;
+  AICreateMonitorCallback monitor;
+
+  DOMString systemPrompt;
+  sequence<AIAssistantPrompt> initialPrompts;
+  [EnforceRange] unsigned long topK;
+  float temperature;
+};
+
+dictionary AIAssistantPrompt {
+  AIAssistantPromptRole role;
   DOMString content;
 };
 
-dictionary AITextModelInfo {
-  unsigned long defaultTopK;
-  unsigned long maxTopK;
-  float defaultTemperature;
+dictionary AIAssistantPromptOptions {
+  AbortSignal signal;
 };
 
-enum AIModelAvailability { "readily", "after-download", "no" };
-enum AIPromptRole { "system", "user", "assistant" };
+enum AIAssistantPromptRole { "system", "user", "assistant" };
 ```
 
 ### Instruction-tuned versus base models
@@ -289,57 +350,7 @@ To illustrate the difference and how it impacts web developer expectations:
 
 To ensure the API can be used by web developers across multiple implementations, all browsers should be sure their models behave like instruction-tuned models.
 
-### Downloading and session creation flow
-
-The state machine for the model downloading and session creation is as follows.
-
-There is a per-global _session creation requested_: a boolean, initially false.
-
-There is a per-user agent _model availability state_. It moves through the following states:
-
-* "cannot provide a model"
-  * `canCreateTextSession()` returns `"no"`
-  * `createTextSession()` rejects with a `"NotSupportedError"` `DOMException`
-* "can provide a model after download"
-  * `canCreateTextSession()` returns `"after-download"`
-  * `createTextSession()`:
-    * Checks argument validity, returning a rejection if invalid. Otherwise:
-    * Sets _session creation requested_ = true.
-    * Transitions us to the "downloading a model" state.
-    * Queues a _create a session_ operation when that finishes, passing the download status.
-* "downloading a model"
-  * `canCreateTextSession()` returns `"after-download"`
-  * `createTextSession()`:
-    * Checks argument validity, returning a rejection if invalid. Otherwise:
-    * Sets _session creation requested_ = true.
-    * Queues a _create a session_ operation for when the ongoing download finishes, passing the download status.
-  * While in this state, if _session creation requested_ is true, the `AI` object fires `textmodeldownloadprogress` events on download progress updates.
-* "model fully available"
-  * `canCreateTextSession()` returns `"readily"`
-  * `createTextSession()`:
-    * Checks argument validity, returning a rejection if invalid. Otherwise:
-    * Starts a _create a session_ operation immediately, passing a download status of success.
-    * (Does _not_ set _session creation requested_.)
-
-_Create a session_ operation: takes as input a download status
-
-* If download status = failure,
-  * Rejects the relevant promise with a `"NetworkError"` `DOMException`
-  * Sets _model availability state_ back to "can provide a model after download"
-* If download status = success,
-  * Set _model availability state_ to "model fully available"
-  * Try to use the model to create a session:
-    * If session creation fails, reject the relevant with various possible errors depending on what type of failure happened.
-    * If session creation succeeds, resolve the relevant promise with undefined.
-* Set _session creation requested_ = false.
-
 ## Alternatives considered and under consideration
-
-### Naming
-
-We don't love the current naming of the API. Especially, the names using "text" would become confusing if the same API eventually gains multi-modal capabilities.
-
-We've started a discussion on the issue tracker to explore alternatives: see [issue #1](https://github.com/explainers-by-googlers/prompt-api/issues/1).
 
 ### How many stages to reach a response?
 
@@ -350,11 +361,11 @@ To actually get a response back from the model given a prompt, the following pos
 3. Add an initial prompt to establish context. (This will not generate a response.)
 4. Execute a prompt and receive a response.
 
-We've chosen to manifest these 3-4 stages into the API as two methods, `createTextSession()` and `prompt()`/`promptStreaming()`, with some additional facilities for dealing with the fact that `createTextSession()` can include a download step. Some APIs simplify this into a single method, and some split it up into three (usually not four).
+We've chosen to manifest these 3-4 stages into the API as two methods, `ai.assistant.create()` and `session.prompt()`/`session.promptStreaming()`, with some additional facilities for dealing with the fact that `ai.assistant.create()` can include a download step. Some APIs simplify this into a single method, and some split it up into three (usually not four).
 
 ### Stateless or session-based
 
-Our design here uses [sessions](#session-persistence-cloning-and-destruction). An alternate design, seen in some APIs, is to require the developer to feed in the entire conversation history to the model each time, keeping track of the results.
+Our design here uses [sessions](#session-persistence-and-cloning). An alternate design, seen in some APIs, is to require the developer to feed in the entire conversation history to the model each time, keeping track of the results.
 
 This can be slightly more flexible; for example, it allows manually correcting the model's responses before feeding them back into the context window.
 
