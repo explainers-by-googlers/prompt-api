@@ -2,7 +2,7 @@
 
 _This proposal is an early design sketch by the Chrome built-in AI team to describe the problem below and solicit feedback on the proposed solution. It has not been approved to ship in Chrome._
 
-Browsers and operating systems are increasingly expected to gain access to a language model. ([Example](https://developer.chrome.com/docs/ai/built-in), [example](https://blogs.windows.com/windowsdeveloper/2024/05/21/unlock-a-new-era-of-innovation-with-windows-copilot-runtime-and-copilot-pcs/).) Language models are known for their versatility. With enough creative [prompting](https://developers.google.com/machine-learning/resources/prompt-eng), they can help accomplish tasks as diverse as:
+Browsers and operating systems are increasingly expected to gain access to a language model. ([Example](https://developer.chrome.com/docs/ai/built-in), [example](https://blogs.windows.com/windowsdeveloper/2024/05/21/unlock-a-new-era-of-innovation-with-windows-copilot-runtime-and-copilot-pcs/), [example](https://www.apple.com/apple-intelligence/).) Language models are known for their versatility. With enough creative [prompting](https://developers.google.com/machine-learning/resources/prompt-eng), they can help accomplish tasks as diverse as:
 
 * Classification, tagging, and keyword extraction of arbitrary text;
 * Helping users compose text, such as blog posts, reviews, or biographies;
