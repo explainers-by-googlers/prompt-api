@@ -109,10 +109,69 @@ const result1 = await predictEmoji("Back to the drawing board");
 const result2 = await predictEmoji("This code is so good you should get promoted");
 ```
 
+(Note that merely creating a session does not cause any new responses from the language model. We need to call `prompt()` or `promptStreaming()` to get a response.)
+
 Some details on error cases:
 
 * Using both `systemPrompt` and a `{ role: "system" }` prompt in `initialPrompts`, or using multiple `{ role: "system" }` prompts, or placing the `{ role: "system" }` prompt anywhere besides at the 0th position in `initialPrompts`, will reject with a `TypeError`.
 * If the combined token length of all the initial prompts (including the separate `systemPrompt`, if provided) is too large, then the promise will be rejected with a `"QuotaExceededError"` `DOMException`.
+
+### Customizing the role per prompt
+
+Our examples so far have provided `prompt()` and `promptStreaming()` with a single string. Such cases assume messages will come from the user role. These methods can also take in objects in the `{ role, content }` format, or arrays of such objects, in case you want to provide multiple user or assistant messages before getting another assistant message:
+
+```js
+const multiUserSession = await ai.languageModel.create({
+  systemPrompt: "You are a mediator in a discussion between two departments."
+});
+
+const result = await multiUserSession.prompt([
+  { role: "user", content: "Marketing: We need more budget for advertising campaigns." },
+  { role: "user", content: "Finance: We need to cut costs and advertising is on the list." },
+  { role: "assistant", content: "Let's explore a compromise that satisfies both departments." }
+]);
+
+// `result` will contain a compromise proposal from the assistant.
+```
+
+Because of their special behavior of being preserved on context window overflow, system prompts cannot be provided this way.
+
+### Emulating tool use or function-calling via assistant-role prompts
+
+A special case of the above is using the assistant role to emulate tool use or function-calling, by marking a response as coming from the assistant side of the conversation:
+
+```js
+const session = await ai.assistant.create({
+  systemPrompt: `
+    You are a helpful assistant. You have access to the following tools:
+    - calculator: A calculator. To use it, write "CALCULATOR: <expression>" where <expression> is a valid mathematical expression.
+  `
+});
+
+async function promptWithCalculator(prompt) {
+  const result = await session.prompt("What is 2 + 2?");
+
+  // Check if the assistant wants to use the calculator tool.
+  const match = /^CALCULATOR: (.*)$/.exec(result);
+  if (match) {
+    const expression = match[1];
+    const mathResult = evaluateMathExpression(expression);
+
+    // Add the result to the session so it's in context going forward.
+    await session.prompt({ role: "assistant", content: mathResult });
+
+    // Return it as if that's what the assistant said to the user.
+    return mathResult;
+  }
+
+  // The assistant didn't want to use the calculator. Just return its response.
+  return result;
+}
+
+console.log(await promptWithCalculator("What is 2 + 2?"));
+```
+
+We'll likely explore more specific APIs for tool- and function-calling in the future; follow along in [issue #7](https://github.com/explainers-by-googlers/prompt-api/issues/7).
 
 ### Configuration of per-session options
 
@@ -345,10 +404,10 @@ interface AILanguageModelFactory {
 
 [Exposed=(Window,Worker), SecureContext]
 interface AILanguageModel : EventTarget {
-  Promise<DOMString> prompt(DOMString input, optional AILanguageModelPromptOptions options = {});
-  ReadableStream promptStreaming(DOMString input, optional AILanguageModelPromptOptions options = {});
+  Promise<DOMString> prompt(AILanguageModelPromptInput input, optional AILanguageModelPromptOptions options = {});
+  ReadableStream promptStreaming(AILanguageModelPromptInput input, optional AILanguageModelPromptOptions options = {});
 
-  Promise<unsigned long long> countPromptTokens(DOMString input, optional AILanguageModelPromptOptions options = {});
+  Promise<unsigned long long> countPromptTokens(AILanguageModelPromptInput input, optional AILanguageModelPromptOptions options = {});
   readonly attribute unsigned long long maxTokens;
   readonly attribute unsigned long long tokensSoFar;
   readonly attribute unsigned long long tokensLeft;
@@ -380,14 +439,19 @@ dictionary AILanguageModelCreateOptions {
   AICreateMonitorCallback monitor;
 
   DOMString systemPrompt;
-  sequence<AILanguageModelPrompt> initialPrompts;
+  sequence<AILanguageModelInitialPrompt> initialPrompts;
   [EnforceRange] unsigned long topK;
   float temperature;
 };
 
+dictionary AILanguageModelInitialPrompt {
+  required AILanguageModelInitialPromptRole role;
+  required DOMString content;
+};
+
 dictionary AILanguageModelPrompt {
-  AILanguageModelPromptRole role;
-  DOMString content;
+  required AILanguageModelPromptRole role;
+  required DOMString content;
 };
 
 dictionary AILanguageModelPromptOptions {
@@ -398,7 +462,10 @@ dictionary AILanguageModelCloneOptions {
   AbortSignal signal;
 };
 
-enum AILanguageModelPromptRole { "system", "user", "assistant" };
+typedef (DOMString or AILanguageModelPrompt or sequence<AILanguageModelPrompt>) AILanguageModelPromptInput;
+
+enum AILanguageModelInitialPromptRole { "system", "user", "assistant" };
+enum AILanguageModelPromptRole { "user", "assistant" };
 ```
 
 ### Instruction-tuned versus base models
