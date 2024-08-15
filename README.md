@@ -179,15 +179,23 @@ or by calling `destroy()` on the session:
 stopButton.onclick = () => session.destroy();
 ```
 
-Destroying a session will:
+Destroying a session will have the following effects:
 
-* Abort any ongoing downloads or loading process for the language model.
+* If done before the promise returned by `create()` is settled:
 
-* Reject any ongoing calls to `prompt()` with an `"AbortError"` `DOMException` (or the given abort reason).
+  * Stop signaling any ongoing download progress for the language model. (The browser may also abort the download, or may continue it. Either way, no further `downloadprogress` events will fire.)
 
-* Error any `ReadableStream`s returned by `promptStreaming()` with an `"AbortError"` `DOMException` (or the given abort reason).
+  * Reject the `create()` promise.
 
-* And, most importantly, allow the user agent to unload the language model from memory. (If no other APIs or sessions are using it.)
+* Otherwise:
+
+  * Reject any ongoing calls to `prompt()`.
+
+  * Error any `ReadableStream`s returned by `promptStreaming()`.
+
+* Most importantly, destroying the session allows the user agent to unload the language model from memory, if no other APIs or sessions are using it.
+
+In all cases the exception used for rejecting promises or erroring `ReadableStream`s will be an `"AbortError"` `DOMException`, or the given abort reason.
 
 The ability to manually destroy a session allows applications to free up memory without waiting for garbage collection, which can be useful since language models can be quite large.
 
