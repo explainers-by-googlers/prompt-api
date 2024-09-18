@@ -129,7 +129,7 @@ const slightlyHighTemperatureSession = await ai.assistant.create({
   temperature: Math.max(capabilities.defaultTemperature * 1.2, 1.0),
 });
 
-// capabilities also contains defaultTopK and maxTopK.
+// capabilities also contains maxTemperature, defaultTopK, and maxTopK.
 ```
 
 ### Session persistence and cloning
@@ -269,7 +269,7 @@ Note that regardless of the return value of `available`, `create()` might also f
 
 The capabilities API also contains other information about the model:
 
-* `defaultTemperature`, `defaultTopK`, and `maxTopK` properties giving information about the model's sampling parameters.
+* `defaultTemperature`, `maxTemperature`, `defaultTopK`, and `maxTopK` properties giving information about the model's sampling parameters.
 * `supportsLanguage(languageTag)`, which returns `"no"`, `"after-download"`, or `"readily"` to indicate whether the model supports conversing in a given human language.
 
 ### Download progress
@@ -363,6 +363,7 @@ interface AIAssistantCapabilities {
   readonly attribute unsigned long? defaultTopK;
   readonly attribute unsigned long? maxTopK;
   readonly attribute float? defaultTemperature;
+  readonly attribute float? maxTemperature;
 
   AICapabilityAvailability supportsLanguage(DOMString languageTag);
 };
