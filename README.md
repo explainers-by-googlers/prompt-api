@@ -162,6 +162,13 @@ const session = await ai.assistant.create({
 const session2 = await session.clone();
 ```
 
+The clone operation can be aborted using an `AbortSignal`:
+
+```js
+const controller = new AbortController();
+const session2 = await session.clone({ signal: controller.signal });
+```
+
 ### Session destruction
 
 An assistant session can be destroyed, either by using an `AbortSignal` passed to the `create()` method call:
@@ -351,7 +358,7 @@ interface AIAssistant : EventTarget {
 
   attribute EventHandler oncontextoverflow;
 
-  Promise<AIAssistant> clone();
+  Promise<AIAssistant> clone(optional AIAssistantCloneOptions options = {});
   undefined destroy();
 };
 
@@ -384,6 +391,10 @@ dictionary AIAssistantPrompt {
 };
 
 dictionary AIAssistantPromptOptions {
+  AbortSignal signal;
+};
+
+dictionary AIAssistantCloneOptions {
   AbortSignal signal;
 };
 
