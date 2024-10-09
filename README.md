@@ -313,15 +313,15 @@ Finally, note that there is a sort of precedent in the (never-shipped) [`FetchOb
 // Shared self.ai APIs
 
 partial interface WindowOrWorkerGlobalScope {
-  [Replaceable] readonly attribute AI ai;
+  [Replaceable, SecureContext] readonly attribute AI ai;
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AI {
   readonly attribute AIAssistantFactory assistant;
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AICreateMonitor : EventTarget {
   attribute EventHandler ondownloadprogress;
 
@@ -337,13 +337,13 @@ enum AICapabilityAvailability { "readily", "after-download", "no" };
 ```webidl
 // Assistant
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AIAssistantFactory {
   Promise<AIAssistant> create(optional AIAssistantCreateOptions options = {});
   Promise<AIAssistantCapabilities> capabilities();
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AIAssistant : EventTarget {
   Promise<DOMString> prompt(DOMString input, optional AIAssistantPromptOptions options = {});
   ReadableStream promptStreaming(DOMString input, optional AIAssistantPromptOptions options = {});
@@ -362,7 +362,7 @@ interface AIAssistant : EventTarget {
   undefined destroy();
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AIAssistantCapabilities {
   readonly attribute AICapabilityAvailability available;
 
