@@ -51,10 +51,10 @@ Both of these potential goals could pose challenges to interoperability, so we w
 
 ### Zero-shot prompting
 
-In this example, a single string is used to prompt the API, which is assumed to come from the user. The returned response is from the assistant.
+In this example, a single string is used to prompt the API, which is assumed to come from the user. The returned response is from the language model.
 
 ```js
-const session = await ai.assistant.create();
+const session = await ai.languageModel.create();
 
 // Prompt the model and wait for the whole result to come back.
 const result = await session.prompt("Write me a poem.");
@@ -69,17 +69,17 @@ for await (const chunk of stream) {
 
 ### System prompts
 
-The assistant can be configured with a special "system prompt" which gives it the context for future interactions:
+The language model can be configured with a special "system prompt" which gives it the context for future interactions:
 
 ```js
-const session = await ai.assistant.create({
+const session = await ai.languageModel.create({
   systemPrompt: "Pretend to be an eloquent hamster."
 });
 
 console.log(await session.prompt("What is your favorite food?"));
 ```
 
-The system prompt is special, in that the assistant will not respond to it, and it will be preserved even if the context window otherwise overflows due to too many calls to `prompt()`.
+The system prompt is special, in that the language model will not respond to it, and it will be preserved even if the context window otherwise overflows due to too many calls to `prompt()`.
 
 If the system prompt is too large (see [below](#tokenization-context-window-length-limits-and-overflow)), then the promise will be rejected with a `"QuotaExceededError"` `DOMException`.
 
@@ -88,7 +88,7 @@ If the system prompt is too large (see [below](#tokenization-context-window-leng
 If developers want to provide examples of the user/assistant interaction, they can use the `initialPrompts` array. This aligns with the common "chat completions API" format of `{ role, content }` pairs, including a `"system"` role which can be used instead of the `systemPrompt` option shown above.
 
 ```js
-const session = await ai.assistant.create({
+const session = await ai.languageModel.create({
   initialPrompts: [
     { role: "system", content: "Predict up to 5 emojis as a response to a comment. Output emojis, comma-separated." },
     { role: "user", content: "This is amazing!" },
@@ -119,13 +119,13 @@ Some details on error cases:
 In addition to the `systemPrompt` and `initialPrompts` options shown above, the currently-configurable options are [temperature](https://huggingface.co/blog/how-to-generate#sampling) and [top-K](https://huggingface.co/blog/how-to-generate#top-k-sampling). More information about the values for these parameters can be found using the `capabilities()` API explained [below](#capabilities-detection).
 
 ```js
-const customSession = await ai.assistant.create({
+const customSession = await ai.languageModel.create({
   temperature: 0.8,
   topK: 10
 });
 
-const capabilities = await ai.assistant.capabilities();
-const slightlyHighTemperatureSession = await ai.assistant.create({
+const capabilities = await ai.languageModel.capabilities();
+const slightlyHighTemperatureSession = await ai.languageModel.create({
   temperature: Math.max(capabilities.defaultTemperature * 1.2, 1.0),
 });
 
@@ -134,10 +134,10 @@ const slightlyHighTemperatureSession = await ai.assistant.create({
 
 ### Session persistence and cloning
 
-Each assistant session consists of a persistent series of interactions with the model:
+Each language model session consists of a persistent series of interactions with the model:
 
 ```js
-const session = await ai.assistant.create({
+const session = await ai.languageModel.create({
   systemPrompt: "You are a friendly, helpful assistant specialized in clothing choices."
 });
 
@@ -155,7 +155,7 @@ const result2 = await session.prompt(`
 Multiple unrelated continuations of the same prompt can be set up by creating a session and then cloning it:
 
 ```js
-const session = await ai.assistant.create({
+const session = await ai.languageModel.create({
   systemPrompt: "You are a friendly, helpful assistant specialized in clothing choices."
 });
 
@@ -171,13 +171,13 @@ const session2 = await session.clone({ signal: controller.signal });
 
 ### Session destruction
 
-An assistant session can be destroyed, either by using an `AbortSignal` passed to the `create()` method call:
+A language model session can be destroyed, either by using an `AbortSignal` passed to the `create()` method call:
 
 ```js
 const controller = new AbortController();
 stopButton.onclick = () => controller.abort();
 
-const session = await ai.assistant.create({ signal: controller.signal });
+const session = await ai.languageModel.create({ signal: controller.signal });
 ```
 
 or by calling `destroy()` on the session:
@@ -225,7 +225,7 @@ Note that because sessions are stateful, and prompts can be queued, aborting a s
 
 ### Tokenization, context window length limits, and overflow
 
-A given assistant session will have a maximum number of tokens it can process. Developers can check their current usage and progress toward that limit by using the following properties on the session object:
+A given language model session will have a maximum number of tokens it can process. Developers can check their current usage and progress toward that limit by using the following properties on the session object:
 
 ```js
 console.log(`${session.tokensSoFar}/${session.maxTokens} (${session.tokensLeft} left)`);
@@ -243,7 +243,7 @@ Some notes on this API:
 * Implementations must include in their count any control tokens that will be necessary to process the prompt, e.g. ones indicating the start or end of the input.
 * The counting process can be aborted by passing an `AbortSignal`, i.e. `session.countPromptTokens(promptString, { signal })`.
 
-It's possible to send a prompt that causes the context window to overflow. That is, consider a case where `session.countPromptTokens(promptString) > session.tokensLeft` before calling `session.prompt(promptString)`, and then the web developer calls `session.prompt(promptString)` anyway. In such cases, the initial portions of the conversation with the assistant will be removed, one prompt/response pair at a time, until enough tokens are available to process the new prompt. The exception is the [system prompt](#system-prompts), which is never removed. If it's not possible to remove enough tokens from the conversation history to process the new prompt, then the `prompt()` or `promptStreaming()` call will fail with an `"QuotaExceededError"` `DOMException` and nothing will be removed.
+It's possible to send a prompt that causes the context window to overflow. That is, consider a case where `session.countPromptTokens(promptString) > session.tokensLeft` before calling `session.prompt(promptString)`, and then the web developer calls `session.prompt(promptString)` anyway. In such cases, the initial portions of the conversation with the language model will be removed, one prompt/response pair at a time, until enough tokens are available to process the new prompt. The exception is the [system prompt](#system-prompts), which is never removed. If it's not possible to remove enough tokens from the conversation history to process the new prompt, then the `prompt()` or `promptStreaming()` call will fail with an `"QuotaExceededError"` `DOMException` and nothing will be removed.
 
 Such overflows can be detected by listening for the `"contextoverflow"` event on the session:
 
@@ -255,12 +255,12 @@ session.addEventListener("contextoverflow", () => {
 
 ### Capabilities detection
 
-In all our above examples, we call `ai.assistant.create()` and assume it will always succeed.
+In all our above examples, we call `ai.languageModel.create()` and assume it will always succeed.
 
 However, sometimes a language model needs to be downloaded before the API can be used. In such cases, immediately calling `create()` will start the download, which might take a long time. The capabilities API gives you insight into the download status of the model:
 
 ```js
-const capabilities = await ai.assistant.capabilities();
+const capabilities = await ai.languageModel.capabilities();
 console.log(capabilities.available);
 ```
 
@@ -284,7 +284,7 @@ The capabilities API also contains other information about the model:
 In cases where the model needs to be downloaded as part of creation, you can monitor the download progress (e.g. in order to show your users a progress bar) using code such as the following:
 
 ```js
-const session = await ai.assistant.create({
+const session = await ai.languageModel.create({
   monitor(m) {
     m.addEventListener("downloadprogress", e => {
       console.log(`Downloaded ${e.loaded} of ${e.total} bytes.`);
@@ -298,7 +298,7 @@ If the download fails, then `downloadprogress` events will stop being emitted, a
 <details>
 <summary>What's up with this pattern?</summary>
 
-This pattern is a little involved. Several alternatives have been considered. However, asking around the web standards community it seemed like this one was best, as it allows using standard event handlers and `ProgressEvent`s, and also ensures that once the promise is settled, the assistant object is completely ready to use.
+This pattern is a little involved. Several alternatives have been considered. However, asking around the web standards community it seemed like this one was best, as it allows using standard event handlers and `ProgressEvent`s, and also ensures that once the promise is settled, the session object is completely ready to use.
 
 It is also nicely future-extensible by adding more events and properties to the `m` object.
 
@@ -318,7 +318,7 @@ partial interface WindowOrWorkerGlobalScope {
 
 [Exposed=(Window,Worker), SecureContext]
 interface AI {
-  readonly attribute AIAssistantFactory assistant;
+  readonly attribute AILanguageModelFactory languageModel;
 };
 
 [Exposed=(Window,Worker), SecureContext]
@@ -335,20 +335,20 @@ enum AICapabilityAvailability { "readily", "after-download", "no" };
 ```
 
 ```webidl
-// Assistant
+// Language Model
 
 [Exposed=(Window,Worker), SecureContext]
-interface AIAssistantFactory {
-  Promise<AIAssistant> create(optional AIAssistantCreateOptions options = {});
-  Promise<AIAssistantCapabilities> capabilities();
+interface AILanguageModelFactory {
+  Promise<AILanguageModel> create(optional AILanguageModelCreateOptions options = {});
+  Promise<AILanguageModelCapabilities> capabilities();
 };
 
 [Exposed=(Window,Worker), SecureContext]
-interface AIAssistant : EventTarget {
-  Promise<DOMString> prompt(DOMString input, optional AIAssistantPromptOptions options = {});
-  ReadableStream promptStreaming(DOMString input, optional AIAssistantPromptOptions options = {});
+interface AILanguageModel : EventTarget {
+  Promise<DOMString> prompt(DOMString input, optional AILanguageModelPromptOptions options = {});
+  ReadableStream promptStreaming(DOMString input, optional AILanguageModelPromptOptions options = {});
 
-  Promise<unsigned long long> countPromptTokens(DOMString input, optional AIAssistantPromptOptions options = {});
+  Promise<unsigned long long> countPromptTokens(DOMString input, optional AILanguageModelPromptOptions options = {});
   readonly attribute unsigned long long maxTokens;
   readonly attribute unsigned long long tokensSoFar;
   readonly attribute unsigned long long tokensLeft;
@@ -358,12 +358,12 @@ interface AIAssistant : EventTarget {
 
   attribute EventHandler oncontextoverflow;
 
-  Promise<AIAssistant> clone(optional AIAssistantCloneOptions options = {});
+  Promise<AILanguageModel> clone(optional AILanguageModelCloneOptions options = {});
   undefined destroy();
 };
 
 [Exposed=(Window,Worker), SecureContext]
-interface AIAssistantCapabilities {
+interface AILanguageModelCapabilities {
   readonly attribute AICapabilityAvailability available;
 
   // Always null if available === "no"
@@ -375,30 +375,30 @@ interface AIAssistantCapabilities {
   AICapabilityAvailability supportsLanguage(DOMString languageTag);
 };
 
-dictionary AIAssistantCreateOptions {
+dictionary AILanguageModelCreateOptions {
   AbortSignal signal;
   AICreateMonitorCallback monitor;
 
   DOMString systemPrompt;
-  sequence<AIAssistantPrompt> initialPrompts;
+  sequence<AILanguageModelPrompt> initialPrompts;
   [EnforceRange] unsigned long topK;
   float temperature;
 };
 
-dictionary AIAssistantPrompt {
-  AIAssistantPromptRole role;
+dictionary AILanguageModelPrompt {
+  AILanguageModelPromptRole role;
   DOMString content;
 };
 
-dictionary AIAssistantPromptOptions {
+dictionary AILanguageModelPromptOptions {
   AbortSignal signal;
 };
 
-dictionary AIAssistantCloneOptions {
+dictionary AILanguageModelCloneOptions {
   AbortSignal signal;
 };
 
-enum AIAssistantPromptRole { "system", "user", "assistant" };
+enum AILanguageModelPromptRole { "system", "user", "assistant" };
 ```
 
 ### Instruction-tuned versus base models
@@ -423,7 +423,7 @@ To actually get a response back from the model given a prompt, the following pos
 3. Add an initial prompt to establish context. (This will not generate a response.)
 4. Execute a prompt and receive a response.
 
-We've chosen to manifest these 3-4 stages into the API as two methods, `ai.assistant.create()` and `session.prompt()`/`session.promptStreaming()`, with some additional facilities for dealing with the fact that `ai.assistant.create()` can include a download step. Some APIs simplify this into a single method, and some split it up into three (usually not four).
+We've chosen to manifest these 3-4 stages into the API as two methods, `ai.languageModel.create()` and `session.prompt()`/`session.promptStreaming()`, with some additional facilities for dealing with the fact that `ai.languageModel.create()` can include a download step. Some APIs simplify this into a single method, and some split it up into three (usually not four).
 
 ### Stateless or session-based
 
