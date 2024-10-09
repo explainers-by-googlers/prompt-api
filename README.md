@@ -336,7 +336,7 @@ Note that regardless of the return value of `available`, `create()` might also f
 The capabilities API also contains other information about the model:
 
 * `defaultTemperature`, `maxTemperature`, `defaultTopK`, and `maxTopK` properties giving information about the model's sampling parameters.
-* `supportsLanguage(languageTag)`, which returns `"no"`, `"after-download"`, or `"readily"` to indicate whether the model supports conversing in a given human language.
+* `languageAvailable(languageTag)`, which returns `"no"`, `"after-download"`, or `"readily"` to indicate whether the model supports conversing in a given human language.
 
 ### Download progress
 
@@ -424,14 +424,13 @@ interface AILanguageModel : EventTarget {
 [Exposed=(Window,Worker), SecureContext]
 interface AILanguageModelCapabilities {
   readonly attribute AICapabilityAvailability available;
+  AICapabilityAvailability languageAvailable(DOMString languageTag);
 
   // Always null if available === "no"
   readonly attribute unsigned long? defaultTopK;
   readonly attribute unsigned long? maxTopK;
   readonly attribute float? defaultTemperature;
   readonly attribute float? maxTemperature;
-
-  AICapabilityAvailability supportsLanguage(DOMString languageTag);
 };
 
 dictionary AILanguageModelCreateOptions {
