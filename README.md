@@ -141,7 +141,7 @@ Because of their special behavior of being preserved on context window overflow,
 A special case of the above is using the assistant role to emulate tool use or function-calling, by marking a response as coming from the assistant side of the conversation:
 
 ```js
-const session = await ai.assistant.create({
+const session = await ai.languageModel.create({
   systemPrompt: `
     You are a helpful assistant. You have access to the following tools:
     - calculator: A calculator. To use it, write "CALCULATOR: <expression>" where <expression> is a valid mathematical expression.
@@ -149,7 +149,7 @@ const session = await ai.assistant.create({
 });
 
 async function promptWithCalculator(prompt) {
-  const result = await session.prompt("What is 2 + 2?");
+  const result = await session.prompt(prompt);
 
   // Check if the assistant wants to use the calculator tool.
   const match = /^CALCULATOR: (.*)$/.exec(result);
