@@ -185,10 +185,14 @@ const customSession = await ai.languageModel.create({
 
 const capabilities = await ai.languageModel.capabilities();
 const slightlyHighTemperatureSession = await ai.languageModel.create({
-  temperature: Math.max(capabilities.defaultTemperature * 1.2, 1.0),
+  temperature: Math.max(
+    capabilities.defaultTemperature * 1.2,
+    capabilities.maxTemperature
+  ),
+  topK: 10
 });
 
-// capabilities also contains maxTemperature, defaultTopK, and maxTopK.
+// capabilities also contains defaultTopK and maxTopK.
 ```
 
 ### Session persistence and cloning
