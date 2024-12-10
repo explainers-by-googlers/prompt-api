@@ -12,7 +12,7 @@ Browsers and operating systems are increasingly expected to gain access to a lan
 * Translation between languages
 * Proofreading
 
-Although the Chrome built-in AI team is exploring purpose-built APIs for some of these use cases (e.g. [translation](https://github.com/WICG/translation-api), and perhaps in the future summarization and compose), we are also exploring a general-purpose "prompt API" which allows web developers to prompt a language model directly. This gives web developers access to many more capabilities, at the cost of requiring them to do their own prompt engineering.
+Although the Chrome built-in AI team is exploring purpose-built APIs for some of these use cases (e.g. [translation](https://github.com/webmachinelearning/translation-api), and perhaps in the future summarization and compose), we are also exploring a general-purpose "prompt API" which allows web developers to prompt a language model directly. This gives web developers access to many more capabilities, at the cost of requiring them to do their own prompt engineering.
 
 Currently, web developers wishing to use language models must either call out to cloud APIs, or bring their own and run them using technologies like WebAssembly and WebGPU. By providing access to the browser or operating system's existing language model, we can provide the following benefits compared to cloud APIs:
 
@@ -171,7 +171,7 @@ async function promptWithCalculator(prompt) {
 console.log(await promptWithCalculator("What is 2 + 2?"));
 ```
 
-We'll likely explore more specific APIs for tool- and function-calling in the future; follow along in [issue #7](https://github.com/explainers-by-googlers/prompt-api/issues/7).
+We'll likely explore more specific APIs for tool- and function-calling in the future; follow along in [issue #7](https://github.com/webmachinelearning/prompt-api/issues/7).
 
 ### Configuration of per-session options
 
@@ -389,7 +389,7 @@ interface AICreateMonitor : EventTarget {
   attribute EventHandler ondownloadprogress;
 
   // Might get more stuff in the future, e.g. for
-  // https://github.com/explainers-by-googlers/prompt-api/issues/4
+  // https://github.com/webmachinelearning/prompt-api/issues/4
 };
 
 callback AICreateMonitorCallback = undefined (AICreateMonitor monitor);
