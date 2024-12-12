@@ -344,7 +344,7 @@ Note that there is no way of specifying output languages, since these are govern
 
 In the simple case, web developers should call `ai.languageModel.create()`, and handle failures gracefully.
 
-However, if the web developer wants to provide a differentiated user experience, which lets users know ahead of time that the feature will not be possible or might require a download, they can use the promise-returning `ai.languageModel.createOptionsAvailable()` method. This method lets developers know, before calling `create()`, what is possible with the implementation.
+However, if the web developer wants to provide a differentiated user experience, which lets users know ahead of time that the feature will not be possible or might require a download, they can use the promise-returning `ai.languageModel.availability()` method. This method lets developers know, before calling `create()`, what is possible with the implementation.
 
 The method will return a promise that fulfills with one of the following availability values:
 
@@ -357,7 +357,7 @@ An example usage is the following:
 ```js
 const options = { expectedInputLanguages: ["en", "es"], temperature: 2 };
 
-const supportsOurUseCase = await ai.languageModel.createOptionsAvailable(options);
+const supportsOurUseCase = await ai.languageModel.availability(options);
 
 if (supportsOurUseCase !== "no") {
   if (supportsOurUseCase === "after-download") {
@@ -433,7 +433,7 @@ enum AICapabilityAvailability { "readily", "after-download", "no" };
 [Exposed=(Window,Worker), SecureContext]
 interface AILanguageModelFactory {
   Promise<AILanguageModel> create(optional AILanguageModelCreateOptions options = {});
-  Promise<AICapabilityAvailability> createOptionsAvailable(optional AILanguageModelCreateCoreOptions options = {});
+  Promise<AICapabilityAvailability> availability(optional AILanguageModelCreateCoreOptions options = {});
   Promise<AILanguageModelInfo?> params();
 };
 
