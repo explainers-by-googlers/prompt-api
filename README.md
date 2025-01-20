@@ -434,7 +434,7 @@ enum AICapabilityAvailability { "readily", "after-download", "no" };
 interface AILanguageModelFactory {
   Promise<AILanguageModel> create(optional AILanguageModelCreateOptions options = {});
   Promise<AICapabilityAvailability> availability(optional AILanguageModelCreateCoreOptions options = {});
-  Promise<AILanguageModelInfo?> params();
+  Promise<AILanguageModelParams?> params();
 };
 
 [Exposed=(Window,Worker), SecureContext]
