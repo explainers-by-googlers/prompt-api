@@ -173,6 +173,56 @@ console.log(await promptWithCalculator("What is 2 + 2?"));
 
 We'll likely explore more specific APIs for tool- and function-calling in the future; follow along in [issue #7](https://github.com/webmachinelearning/prompt-api/issues/7).
 
+### Multimodal inputs
+
+All of the above examples have been of text prompts. Some language models also support other inputs. Our design initially includes the potential to support images and audio clips as inputs. This is done by using objects in the form `{ type: "image", data }` and `{ type: "audio", data }` instead of strings. The `data` values can be the following:
+
+* For image inputs: [`ImageBitmapSource`](https://html.spec.whatwg.org/#imagebitmapsource), i.e. `Blob`, `ImageData`, `ImageBitmap`, `VideoFrame`, `OffscreenCanvas`, `HTMLImageElement`, `SVGImageElement`, `HTMLCanvasElement`, or `HTMLVideoElement` (will get the current frame). Also raw bytes via `BufferSource` (i.e. `ArrayBuffer` or typed arrays).
+
+* For audio inputs: for now, `Blob`, `AudioBuffer`, `HTMLAudioElement`. Also raw bytes via `BufferSource`. Other possibilities we're investigating include `AudioData` and `MediaStream`, but we're not yet sure if those are suitable to represent "clips".
+
+Sessions that will include these inputs need to be created using the `expectedInputTypes` option, to ensure that any necessary downloads are done as part of session creation, and that if the model is not capable of such multimodal prompts, the session creation fails.
+
+A sample of using these APIs:
+
+```js
+const session = await ai.languageModel.create({
+  expectedInputTypes: ["audio", "image"] // "text" is always expected
+});
+
+const referenceImage = await (await fetch("/reference-image.jpeg")).blob();
+const userDrawnImage = document.querySelector("canvas");
+
+const response1 = await session.prompt([
+  "Give a helpful artistic critique of how well the second image matches the first:",
+  { type: "image", data: referenceImage },
+  { type: "image", data: userDrawnImage }
+]);
+
+console.log(response1);
+
+const audioBlob = await captureMicrophoneInput({ seconds: 10 });
+
+const response2 = await session.prompt(
+  "My response to your critique:",
+  { type: "audio", data: audioBlob }
+);
+```
+
+Future extensions may include more ambitious multimodal inputs, such as video clips, or realtime audio or video. (Realtime might require a different API design, more based around events or streams instead of messages.)
+
+Edge-case details:
+
+* `HTMLAudioElement` can also represent streaming audio data (e.g., when it is connected to a `MediaSource`). Such cases will throw a `"NotSupportedError"` `DOMException` for now.
+
+* `HTMLAudioElement` might be connected to an audio source (e.g., a URL) that is not totally downloaded when the prompt API is called. In such cases, calling into the prompt API will force the download to complete.
+
+* Text prompts can also be done via `{ type: "text", data: aString }`, instead of just `aString`. This can be useful for generic code.
+
+* Attempting to supply an invalid combination, e.g. `{ type: "audio", data: anImageBitmap }`, `{ type: "image", data: anAudioBuffer }`, or `{ type: "text", data: anArrayBuffer }`, will throw a `TypeError`.
+
+* Attempting to give an image or audio prompt with the `"assistant"` role will currently throw a `"NotSupportedError"` `DOMException`. (Although as we explore multimodal outputs, this restriction might be lifted in the future.)
+
 ### Configuration of per-session parameters
 
 In addition to the `systemPrompt` and `initialPrompts` options shown above, the currently-configurable model parameters are [temperature](https://huggingface.co/blog/how-to-generate#sampling) and [top-K](https://huggingface.co/blog/how-to-generate#top-k-sampling). The `params()` API gives the default, minimum, and maximum values for these parameters.
@@ -355,7 +405,11 @@ The method will return a promise that fulfills with one of the following availab
 An example usage is the following:
 
 ```js
-const options = { expectedInputLanguages: ["en", "es"], temperature: 2 };
+const options = {
+  expectedInputLanguages: ["en", "es"],
+  expectedInputTypes: ["audio"],
+  temperature: 2
+};
 
 const supportsOurUseCase = await ai.languageModel.availability(options);
 
@@ -450,6 +504,7 @@ interface AILanguageModel : EventTarget {
   readonly attribute unsigned long topK;
   readonly attribute float temperature;
   readonly attribute FrozenArray<DOMString>? expectedInputLanguages;
+  readonly attribute FrozenArray<AILanguageModelPromptType> expectedInputTypes; // always contains at least "text"
 
   attribute EventHandler oncontextoverflow;
 
@@ -469,6 +524,7 @@ dictionary AILanguageModelCreateCoreOptions {
   [EnforceRange] unsigned long topK;
   float temperature;
   sequence<DOMString> expectedInputLanguages;
+  sequence<AILanguageModelPromptType> expectedInputTypes;
 }
 
 dictionary AILanguageModelCreateOptions : AILanguageModelCreateCoreOptions {
@@ -481,12 +537,17 @@ dictionary AILanguageModelCreateOptions : AILanguageModelCreateCoreOptions {
 
 dictionary AILanguageModelInitialPrompt {
   required AILanguageModelInitialPromptRole role;
-  required DOMString content;
+  required AILanguageModelPromptContentInput content;
 };
 
 dictionary AILanguageModelPrompt {
   required AILanguageModelPromptRole role;
-  required DOMString content;
+  required AILanguageModelPromptContentInput content;
+};
+
+dictionary AILanguageModelPromptContent {
+  required AILanguageModelPromptType type;
+  required AILanguageModelPromptData data;
 };
 
 dictionary AILanguageModelPromptOptions {
@@ -497,10 +558,13 @@ dictionary AILanguageModelCloneOptions {
   AbortSignal signal;
 };
 
+typedef (DOMString or AILanguageModelPromptContent) AILanguageModelPromptContentInput;
 typedef (DOMString or AILanguageModelPrompt or sequence<AILanguageModelPrompt>) AILanguageModelPromptInput;
+typedef (ImageBitmapSource or BufferSource or AudioBuffer or HTMLAudioElement or DOMString) AILanguageModelPromptData;
 
 enum AILanguageModelInitialPromptRole { "system", "user", "assistant" };
 enum AILanguageModelPromptRole { "user", "assistant" };
+enum AILanguageModelPromptType { "text", "image", "audio" };
 ```
 
 ### Instruction-tuned versus base models
