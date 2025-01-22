@@ -211,17 +211,25 @@ const response2 = await session.prompt(
 
 Future extensions may include more ambitious multimodal inputs, such as video clips, or realtime audio or video. (Realtime might require a different API design, more based around events or streams instead of messages.)
 
-Edge-case details:
+Details:
 
-* `HTMLAudioElement` can also represent streaming audio data (e.g., when it is connected to a `MediaSource`). Such cases will throw a `"NotSupportedError"` `DOMException` for now.
+* Cross-origin data that has not been exposed using the `Access-Control-Allow-Origin` header cannot be used with the prompt API, and will reject with a `"SecurityError"` `DOMException`. This applies to `HTMLImageElement`, `SVGImageElement`, `HTMLAudioElement`, `HTMLVideoElement`, `HTMLCanvasElement`, and `OffscreenCanvas`. Note that this is more strict than `createImageBitmap()`, which has a tainting mechanism which allows creating opaque image bitmaps from unexposed cross-origin resources. For the prompt API, such resources will just fail. This includes attempts to use cross-origin-tainted canvases.
+
+* Raw-bytes cases (`Blob` and `BufferSource`) will apply the appropriate sniffing rules ([for images](https://mimesniff.spec.whatwg.org/#rules-for-sniffing-images-specifically), [for audio](https://mimesniff.spec.whatwg.org/#rules-for-sniffing-audio-and-video-specifically)) and reject with a `"NotSupportedError"` `DOMException` if the format is not supported. This behavior is similar to that of `createImageBitmap()`.
+
+* Animated images will be required to snapshot the first frame (like `createImageBitmap()`). In the future, animated image input may be supported via some separate opt-in, similar to video clip input. But we don't want interoperability problems from some implementations supporting animated images and some not, in the initial version.
+
+* `HTMLAudioElement` can also represent streaming audio data (e.g., when it is connected to a `MediaSource`). Such cases will reject with a `"NotSupportedError"` `DOMException` for now.
 
 * `HTMLAudioElement` might be connected to an audio source (e.g., a URL) that is not totally downloaded when the prompt API is called. In such cases, calling into the prompt API will force the download to complete.
 
+* Similarly for `HTMLVideoElement`, even a single frame might not yet be downloaded when the prompt API is called. In such cases, calling into the prompt API will force at least a single frame's worth of video to download. (The intent is to behave the same as `createImageBitmap(videoEl)`.)
+
 * Text prompts can also be done via `{ type: "text", data: aString }`, instead of just `aString`. This can be useful for generic code.
 
-* Attempting to supply an invalid combination, e.g. `{ type: "audio", data: anImageBitmap }`, `{ type: "image", data: anAudioBuffer }`, or `{ type: "text", data: anArrayBuffer }`, will throw a `TypeError`.
+* Attempting to supply an invalid combination, e.g. `{ type: "audio", data: anImageBitmap }`, `{ type: "image", data: anAudioBuffer }`, or `{ type: "text", data: anArrayBuffer }`, will reject with a `TypeError`.
 
-* Attempting to give an image or audio prompt with the `"assistant"` role will currently throw a `"NotSupportedError"` `DOMException`. (Although as we explore multimodal outputs, this restriction might be lifted in the future.)
+* Attempting to give an image or audio prompt with the `"assistant"` role will currently reject with a `"NotSupportedError"` `DOMException`. (Although as we explore multimodal outputs, this restriction might be lifted in the future.)
 
 ### Configuration of per-session parameters
 
@@ -525,29 +533,14 @@ dictionary AILanguageModelCreateCoreOptions {
   float temperature;
   sequence<DOMString> expectedInputLanguages;
   sequence<AILanguageModelPromptType> expectedInputTypes;
-}
+};
 
 dictionary AILanguageModelCreateOptions : AILanguageModelCreateCoreOptions {
   AbortSignal signal;
   AICreateMonitorCallback monitor;
 
   DOMString systemPrompt;
-  sequence<AILanguageModelInitialPrompt> initialPrompts;
-};
-
-dictionary AILanguageModelInitialPrompt {
-  required AILanguageModelInitialPromptRole role;
-  required AILanguageModelPromptContentInput content;
-};
-
-dictionary AILanguageModelPrompt {
-  required AILanguageModelPromptRole role;
-  required AILanguageModelPromptContentInput content;
-};
-
-dictionary AILanguageModelPromptContent {
-  required AILanguageModelPromptType type;
-  required AILanguageModelPromptData data;
+  sequence<AILanguageModelInitialPromptLine> initialPrompts;
 };
 
 dictionary AILanguageModelPromptOptions {
@@ -558,13 +551,44 @@ dictionary AILanguageModelCloneOptions {
   AbortSignal signal;
 };
 
-typedef (DOMString or AILanguageModelPromptContent) AILanguageModelPromptContentInput;
-typedef (DOMString or AILanguageModelPrompt or sequence<AILanguageModelPrompt>) AILanguageModelPromptInput;
+// The argument to the prompt() method and others like it
+
+typedef (AILanguageModelPromptLine or sequence<AILanguageModelPromptLine>) AILanguageModelPromptInput;
+
+// Initial prompt lines
+
+dictionary AILanguageModelInitialPromptLineDict {
+  required AILanguageModelInitialPromptRole role;
+  required AILanguageModelPromptContent content;
+};
+
+typedef (DOMString or AILanguageModelInitialPromptLineDict) AILanguageModelInitialPromptLine;
+
+// Prompt lines
+
+dictionary AILanguageModelPromptLineDict {
+  required AILanguageModelPromptRole role;
+  required AILanguageModelPromptContent content;
+};
+
+typedef (DOMString or AILanguageModelPromptLineDict) AILanguageModelPromptLine;
+
+// Prompt content inside the lines
+
+dictionary AILanguageModelPromptContentDict {
+  required AILanguageModelPromptType type;
+  required AILanguageModelPromptData data;
+};
+
+typedef (DOMString or AILanguageModelPromptContentDict) AILanguageModelPromptContent;
+
 typedef (ImageBitmapSource or BufferSource or AudioBuffer or HTMLAudioElement or DOMString) AILanguageModelPromptData;
+enum AILanguageModelPromptType { "text", "image", "audio" };
+
+// Prompt roles inside the lines
 
 enum AILanguageModelInitialPromptRole { "system", "user", "assistant" };
 enum AILanguageModelPromptRole { "user", "assistant" };
-enum AILanguageModelPromptType { "text", "image", "audio" };
 ```
 
 ### Instruction-tuned versus base models
