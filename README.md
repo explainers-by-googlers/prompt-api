@@ -334,7 +334,7 @@ const session = await ai.languageModel.create({
     prefer speaking in Japanese, and return to the Japanese conversation once any sidebars are
     concluded.
   `,
-  expectedInputLanguages: ["en" /* for the system prompt */, "ja", "kr"]
+  expectedInputLanguages: ["en" /* for the system prompt */, "ja", "ko"]
 });
 ```
 
