@@ -562,7 +562,11 @@ dictionary AILanguageModelInitialPromptLineDict {
   required AILanguageModelPromptContent content;
 };
 
-typedef (DOMString or AILanguageModelInitialPromptLineDict) AILanguageModelInitialPromptLine;
+typedef (
+  DOMString                                 // interpreted as { role: "user", content: { type: "text", data: providedValue } }
+  or AILanguageModelPromptContent           // interpreted as { role: "user", content: providedValue }
+  or AILanguageModelInitialPromptLineDict   // canonical form
+) AILanguageModelInitialPromptLine;
 
 // Prompt lines
 
@@ -571,7 +575,11 @@ dictionary AILanguageModelPromptLineDict {
   required AILanguageModelPromptContent content;
 };
 
-typedef (DOMString or AILanguageModelPromptLineDict) AILanguageModelPromptLine;
+typedef (
+  DOMString                                 // interpreted as { role: "user", content: { type: "text", data: providedValue } }
+  or AILanguageModelPromptContent           // interpreted as { role: "user", content: providedValue }
+  or AILanguageModelPromptLineDict          // canonical form
+) AILanguageModelPromptLine;
 
 // Prompt content inside the lines
 
