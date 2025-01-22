@@ -203,10 +203,10 @@ console.log(response1);
 
 const audioBlob = await captureMicrophoneInput({ seconds: 10 });
 
-const response2 = await session.prompt(
+const response2 = await session.prompt([
   "My response to your critique:",
   { type: "audio", data: audioBlob }
-);
+]);
 ```
 
 Future extensions may include more ambitious multimodal inputs, such as video clips, or realtime audio or video. (Realtime might require a different API design, more based around events or streams instead of messages.)
