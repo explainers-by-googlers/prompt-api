@@ -468,8 +468,9 @@ interface AILanguageModelParams {
 };
 
 dictionary AILanguageModelCreateCoreOptions {
-  // Note: these two have custom out-of-range handling behavior, not in the IDL layer
-  long long topK;
+  // Note: these two have custom out-of-range handling behavior, not in the IDL layer.
+  // They are unrestricted double so as to allow +Infinity without failing.
+  unrestricted double topK;
   unrestricted double temperature;
 
   sequence<DOMString> expectedInputLanguages;
