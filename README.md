@@ -173,6 +173,36 @@ console.log(await promptWithCalculator("What is 2 + 2?"));
 
 We'll likely explore more specific APIs for tool- and function-calling in the future; follow along in [issue #7](https://github.com/webmachinelearning/prompt-api/issues/7).
 
+### Structured output or JSON output
+
+To help with programmatic processing of language model responses, the prompt API supports structured outputs defined by a JSON schema.
+
+```js
+const session = await ai.languageModel.create();
+
+const responseJSONSchemaObj = new AILanguageModelResponseSchema({
+  "type" : "object",
+  "required" : ["Rating"],
+  "additionalProperties" : false,
+  "properties" : {
+    "Rating": {
+      "type": "number"
+      "minimum": 0,
+      "maximum": 5
+    }
+  }
+});
+
+// Prompt the model and wait for the json response to come back.
+const result = await session.prompt("Summarize this feedback into a rating between 0-5: "+
+  "The food was delicious, service was excellent, will recommend.",
+  {responseJSONSchema : responseJSONSchemaObj}
+);
+console.log(result);
+```
+
+The responseJSONSchema field in the prompt options passed to session.prompt can accept a JSON Schema directly as a JavaScript object. This is particularly useful for cases where the schema is not reused for other prompts. If required developers should validate the response against the schema to ensure full conformity, as some aspects of the JSON schema may not be enforced by the API.
+
 ### Configuration of per-session parameters
 
 In addition to the `systemPrompt` and `initialPrompts` options shown above, the currently-configurable model parameters are [temperature](https://huggingface.co/blog/how-to-generate#sampling) and [top-K](https://huggingface.co/blog/how-to-generate#top-k-sampling). The `params()` API gives the default, minimum, and maximum values for these parameters.
@@ -465,6 +495,11 @@ interface AILanguageModelParams {
   readonly attribute float maxTemperature;
 };
 
+[Exposed=Window]
+interface AILanguageModelResponseSchema {
+  constructor(object responseJSONSchemaObject);
+}
+
 dictionary AILanguageModelCreateCoreOptions {
   [EnforceRange] unsigned long topK;
   float temperature;
@@ -490,6 +525,7 @@ dictionary AILanguageModelPrompt {
 };
 
 dictionary AILanguageModelPromptOptions {
+  object responseJSONSchema;
   AbortSignal signal;
 };
 
