@@ -201,7 +201,9 @@ const result = await session.prompt("Summarize this feedback into a rating betwe
 console.log(result);
 ```
 
-The responseJSONSchema field in the prompt options passed to session.prompt can accept a JSON Schema directly as a JavaScript object. This is particularly useful for cases where the schema is not reused for other prompts. If required developers should validate the response against the schema to ensure full conformity, as some aspects of the JSON schema may not be enforced by the API.
+The `responseJSONSchema` option for `prompt()` and `promptStreaming()` can also accept a JSON schema directly as a JavaScript object. This is particularly useful for cases where the schema is not reused for other prompts.
+
+If perfect conformance is required, developers should validate the response against the schema to ensure full conformity, as some aspects of the JSON schema may not be enforced by the API.
 
 ### Configuration of per-session parameters
 
