@@ -497,7 +497,7 @@ interface AILanguageModelParams {
   readonly attribute float maxTemperature;
 };
 
-[Exposed=Window]
+[Exposed=(Window,Worker)]
 interface AILanguageModelResponseSchema {
   constructor(object responseJSONSchemaObject);
 }
